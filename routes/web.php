@@ -15,18 +15,22 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 // Grouped Routes for Authenticated Users
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth'])->group(function () {
     // Profile Routes
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');       // Show edit profile form
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update'); // Update profile details
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy'); // Delete profile
+    Route::prefix('profile')->name('profile.')->group(function () {
+        Route::get('/', [ProfileController::class, 'edit'])->name('edit');       // Show edit profile form
+        Route::patch('/', [ProfileController::class, 'update'])->name('update'); // Update profile details
+        Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy'); // Delete profile
+    });
 
     // File Management Routes
-    Route::middleware('auth')->group(function () {
-        Route::resource('files', FileController::class)->only(['index', 'create', 'store']); // Added 'create'
-        Route::get('files/{id}/download', [FileController::class, 'download'])->name('files.download');
-        Route::delete('files/{id}', [FileController::class, 'destroy'])->name('files.destroy'); // Added destroy route for file deletion
-        Route::post('files/mass-delete', [FileController::class, 'massDelete'])->name('files.massDelete'); // Mass delete route
+    Route::prefix('files')->name('files.')->group(function () {
+        Route::get('/', [FileController::class, 'index'])->name('index');       // List files
+        Route::get('/create', [FileController::class, 'create'])->name('create'); // Show upload form
+        Route::post('/', [FileController::class, 'store'])->name('store');       // Upload file
+        Route::get('/{id}/download', [FileController::class, 'download'])->name('download'); // Download file
+        Route::delete('/{id}', [FileController::class, 'destroy'])->name('destroy');         // Delete file
+        Route::post('/mass-delete', [FileController::class, 'massDelete'])->name('massDelete'); // Mass delete files
     });
 });
 

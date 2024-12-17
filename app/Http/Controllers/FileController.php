@@ -2,30 +2,41 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\File;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class FileController extends Controller
 {
-    // Display all files with pagination and sorting
+    /**
+     * Display a list of uploaded files with search functionality.
+     */
     public function index(Request $request)
     {
-        // Fetch and filter files based on search query
+        // Search query
         $search = $request->input('search');
 
-        // Fetch paginated files, sorting by upload time
-        $files = File::query()
-            ->when($search, function ($query, $search) {
-                return $query->where('file_name', 'like', "%{$search}%")
-                    ->orWhere('uploader', 'like', "%{$search}%");
-            })
-            ->orderBy('uploaded_at', 'desc') // Sorting files by upload time in descending order
-            ->paginate(5); // Paginate with 10 items per page
+        // Fetch files with optional search filter
+        $files = File::when($search, function ($query, $search) {
+            return $query->where('file_name', 'like', "%$search%");
+        })
+            ->latest()
+            ->paginate(5);
 
-        return view('file.index', compact('files', 'search'));
+        return view('file.index', compact('files'));
     }
 
+    /**
+     * Show the file upload form.
+     */
+    public function create()
+    {
+        return view('file.create');
+    }
+
+    /**
+     * Store the uploaded file in storage and database.
+     */
     // Store uploaded file
     public function store(Request $request)
     {
@@ -55,56 +66,72 @@ class FileController extends Controller
         return back()->with('success', 'Files uploaded successfully.');
     }
 
-    // Show file upload form
-    public function create()
+    /**
+     * Download a specific file.
+     */
+    public function download(File $file)
     {
-        return view('file.create'); // Ensure you have this view file
-    }
-
-    // Download file
-    public function download($id)
-    {
-        $file = File::findOrFail($id);
-        return Storage::disk('public')->download($file->file_path, $file->file_name); // Return file for download
-    }
-
-    // Destroy file (delete it from both storage and database)
-    public function destroy($id)
-    {
-        $file = File::findOrFail($id);
-
-        // Delete the file from storage
-        Storage::disk('public')->delete($file->file_path);
-
-        // Delete the file record from the database
-        $file->delete();
-
-        // Return a success response
-        return response()->json([
-            'success' => true,
-            'message' => 'File deleted successfully.'
-        ]);
-    }
-
-
-    // Mass delete selected files
-    public function massDelete(Request $request)
-    {
-        $fileIds = $request->input('file_ids');
-
-        if ($fileIds) {
-            // Fetch the files to delete
-            $files = File::whereIn('id', $fileIds)->get();
-
-            // Delete files from storage
-            foreach ($files as $file) {
-                Storage::disk('public')->delete($file->file_path);
-                $file->delete(); // Delete the file record from the database
-            }
-
-            return redirect()->route('files.index')->with('success', 'Files deleted successfully.');
+        // Check if file exists in storage
+        if (Storage::disk('public')->exists($file->file_path)) {
+            return Storage::disk('public')->download($file->file_path, $file->file_name);
         }
 
-        return redirect()->route('files.index')->with('error', 'No files selected.');
+        return redirect()->route('files.index')
+            ->with('error', 'File not found.');
+    }
+
+    /**
+     * Delete a single file from storage and database.
+     */
+    public function destroy($id)
+    {
+        // Fetch the file record from the database
+        $file = File::find($id);
+
+        if (!$file) {
+            return redirect()->back()->with('error', 'File not found.');
+        }
+
+        // Get the file path from the database
+        $filePath = $file->file_path;
+
+        if ($filePath && Storage::disk('public')->exists($filePath)) {
+            // Delete the file from storage
+            Storage::disk('public')->delete($filePath);
+        }
+
+        // Delete the record from the database
+        $file->delete();
+
+        return redirect()->route('files.index')
+            ->with('success', 'File deleted successfully.');
+    }
+
+    /**
+     * Delete multiple selected files.
+     */
+    public function massDelete(Request $request)
+    {
+        // Validate the file IDs
+        $request->validate([
+            'file_ids' => 'required|array',
+            'file_ids.*' => 'exists:files,id',
+        ]);
+
+        // Fetch files to delete
+        $files = File::whereIn('id', $request->file_ids)->get();
+
+        foreach ($files as $file) {
+            // Check and delete from storage
+            if (Storage::disk('public')->exists($file->file_path)) {
+                Storage::disk('public')->delete($file->file_path);
+            }
+
+            // Delete the record from the database
+            $file->delete();
+        }
+
+        return redirect()->route('files.index')
+            ->with('success', 'Selected files deleted successfully.');
     }
 }
