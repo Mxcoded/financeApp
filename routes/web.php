@@ -2,19 +2,9 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\FileController;
 
 Route::get('/', function () {
-    return redirect()->route('files.index');
-});
-
-// Authentication routes
-require __DIR__ . '/auth.php';
-
-// File upload/download routes
-Route::middleware('auth')->group(function () {
-    Route::resource('files', FileController::class)->only(['index', 'create', 'store']);
-    Route::get('files/{id}/download', [FileController::class, 'download'])->name('files.download');
+    return view('welcome');
 });
 
 Route::get('/dashboard', function () {
