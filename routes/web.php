@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 // Public Route: Home Page
 Route::get('/', function () {
-    return view('welcome');
+    return view('test1');
 });
 
 // Protected Route: Dashboard (Requires Authentication and Email Verification)
