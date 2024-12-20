@@ -21,7 +21,7 @@ class FileController extends Controller
             return $query->where('file_name', 'like', "%$search%");
         })
             ->latest()
-            ->paginate(5);
+            ->paginate(10);
 
         return view('file.index', compact('files'));
     }
@@ -37,48 +37,57 @@ class FileController extends Controller
     /**
      * Store the uploaded file in storage and database.
      */
-    // Store uploaded file
     public function store(Request $request)
     {
-        // Validate the uploaded files
+        // Validate the file upload
         $request->validate([
-            'files.*' => 'required|file|max:20048', // Max file size: 20MB for each file
+            'file' => 'required|file|max:10240', // Max 10MB
         ]);
 
-        $files = $request->file('files');
-        foreach ($files as $file) {
-            // Store file and get its path and size
-            $path = $file->store('uploads', 'public');
-            $size = $file->getSize();
-            $isPdf = $file->getClientOriginalExtension() === 'pdf'; // Check if the file is PDF
+        // Store the file in 'uploads' folder within 'public' disk
+        $uploadedFile = $request->file('file');
+        $filePath = $uploadedFile->store('uploads', 'public');
 
-            // Store file details in DB
-            File::create([
-                'file_name' => $file->getClientOriginalName(),
-                'file_path' => $path,
-                'file_size' => $size,
-                'uploader' => auth()->user()->name ?? 'Unknown', // Get the uploader's name
-                'uploaded_at' => now(),
-                'is_pdf' => $isPdf, // Mark if the file is a PDF
-            ]);
-        }
+        // Save file details to the database
+        File::create([
+            'file_name' => $uploadedFile->getClientOriginalName(),
+            'file_size' => $uploadedFile->getSize(),
+            'file_path' => $filePath, // Save the path to 'file_path' column
+            'uploader' => auth()->user()->name ?? 'Anonymous',
+            'uploaded_at' => now(),
+        ]);
 
-        return back()->with('success', 'Files uploaded successfully.');
+        return redirect()->route('files.index')
+            ->with('success', 'File uploaded successfully!');
     }
 
     /**
      * Download a specific file.
      */
-    public function download(File $file)
+    /**
+     * Download a specific file by its ID.
+     */
+    public function download($id)
     {
-        // Check if file exists in storage
-        if (Storage::disk('public')->exists($file->file_path)) {
+        // Fetch the file record from the database using its ID
+        $file = File::find($id);
+
+        // Check if the file record exists
+        if (!$file) {
+            return redirect()->route('files.index')
+            ->with('error', 'File not found in the database.');
+        }
+
+        // Check if the file exists in storage
+        if ($file->file_path && Storage::disk('public')->exists($file->file_path)) {
             return Storage::disk('public')->download($file->file_path, $file->file_name);
         }
 
+        // Return an error if the file is missing from storage
         return redirect()->route('files.index')
-            ->with('error', 'File not found.');
+        ->with('error', 'File not found in storage.');
     }
+
 
     /**
      * Delete a single file from storage and database.
