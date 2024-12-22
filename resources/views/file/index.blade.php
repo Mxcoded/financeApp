@@ -105,7 +105,7 @@
                     </a>
 
                     <!-- Delete Icon for Individual Files (Admin Only) -->
-                   @if(auth()->check())
+                   @if(auth()->user()->is_admin)
                     <form action="{{ route('files.destroy', $file->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this file?');">
                       @csrf
                       @method('DELETE')
@@ -144,22 +144,53 @@
       toggleDeleteButton();
     });
 
-    // Toggle the mass delete button visibility based on selected checkboxes
-    const checkboxes = document.querySelectorAll('.file-checkbox');
-    checkboxes.forEach(checkbox => {
-      checkbox.addEventListener('change', function() {
-        toggleDeleteButton();
+ // Enable "Delete Selected" button if any checkbox is checked
+  document.addEventListener('DOMContentLoaded', function () {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const fileCheckboxes = document.querySelectorAll('.file-checkbox');
+    const massDeleteButton = document.getElementById('massDeleteButton');
+
+    // Handle "Select All" functionality
+    selectAllCheckbox.addEventListener('change', function () {
+      fileCheckboxes.forEach((checkbox) => {
+        checkbox.checked = selectAllCheckbox.checked;
       });
+      toggleDeleteButton();
     });
 
+    // Handle individual checkbox changes
+    fileCheckboxes.forEach((checkbox) => {
+      checkbox.addEventListener('change', toggleDeleteButton);
+    });
+
+    // Toggle the visibility of the delete button
     function toggleDeleteButton() {
-      const selectedFiles = document.querySelectorAll('.file-checkbox:checked');
-      const massDeleteButton = document.getElementById('massDeleteButton');
-      if (selectedFiles.length > 0) {
-        massDeleteButton.classList.remove('hidden');
-      } else {
-        massDeleteButton.classList.add('hidden');
-      }
+      const anyChecked = Array.from(fileCheckboxes).some((checkbox) => checkbox.checked);
+      massDeleteButton.classList.toggle('hidden', !anyChecked);
     }
+
+    // Add selected file IDs to the form dynamically
+    const massDeleteForm = document.getElementById('massDeleteForm');
+    massDeleteForm.addEventListener('submit', function (event) {
+      const selectedIds = Array.from(fileCheckboxes)
+        .filter((checkbox) => checkbox.checked)
+        .map((checkbox) => checkbox.value);
+
+      if (selectedIds.length === 0) {
+        event.preventDefault();
+        alert('Please select at least one file to delete.');
+        return;
+      }
+
+      // Dynamically append hidden input fields for selected IDs
+      selectedIds.forEach((id) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'file_ids[]';
+        input.value = id;
+        massDeleteForm.appendChild(input);
+      });
+    });
+  });
   </script>
 </x-app-layout>

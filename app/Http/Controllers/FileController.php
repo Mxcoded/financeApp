@@ -35,31 +35,37 @@ class FileController extends Controller
     }
 
     /**
-     * Store the uploaded file in storage and database.
+     * Store the uploaded files in storage and database.
      */
     public function store(Request $request)
     {
-        // Validate the file upload
+        // Validate the uploaded files
         $request->validate([
-            'file' => 'required|file|max:10240', // Max 10MB
+            'files.*' => 'required|file|max:10240', // Max 10MB per file
         ]);
 
-        // Store the file in 'uploads' folder within 'public' disk
-        $uploadedFile = $request->file('file');
-        $filePath = $uploadedFile->store('uploads', 'public');
+        $uploadedFiles = $request->file('files');
 
-        // Save file details to the database
-        File::create([
-            'file_name' => $uploadedFile->getClientOriginalName(),
-            'file_size' => $uploadedFile->getSize(),
-            'file_path' => $filePath, // Save the path to 'file_path' column
-            'uploader' => auth()->user()->name ?? 'Anonymous',
-            'uploaded_at' => now(),
-        ]);
+        if (!empty($uploadedFiles)) {
+            foreach ($uploadedFiles as $uploadedFile) {
+                // Store the file in 'uploads' folder within 'public' disk
+                $filePath = $uploadedFile->store('uploads', 'public');
+
+                // Save file details to the database
+                File::create([
+                    'file_name' => $uploadedFile->getClientOriginalName(),
+                    'file_size' => $uploadedFile->getSize(),
+                    'file_path' => $filePath, // Save the path to 'file_path' column
+                    'uploader' => auth()->user()->name ?? 'Anonymous',
+                    'uploaded_at' => now(),
+                ]);
+            }
+        }
 
         return redirect()->route('files.index')
-            ->with('success', 'File uploaded successfully!');
+        ->with('success', 'Files uploaded successfully!');
     }
+
 
     /**
      * Download a specific file.
